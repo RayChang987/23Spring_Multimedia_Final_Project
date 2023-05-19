@@ -129,6 +129,28 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// </summary>
         private string statusText = null;
 
+        ActionCode actionCode0 = ActionCode.None;
+        ActionCode actionCode1 = ActionCode.None;
+
+        enum ActionCode {
+            None = 0,
+            Left = 1,
+            Right = 2,
+            Forward = 3,
+            Back = 4,
+            Stop = 5,
+            GameStart = 6,
+            Error = 7
+        }
+
+        private Tuple<ActionCode, ActionCode> get_control_signal() {
+            return new Tuple<ActionCode, ActionCode>(this.actionCode0, this.actionCode1);
+        }
+
+        private void send_sigals(Tuple<ActionCode, ActionCode> actionCodes) {
+            this.signal_info.Content = actionCodes.Item1.ToString() + " " + actionCodes.Item2.ToString();
+        }
+
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
         /// </summary>
@@ -338,132 +360,191 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             if (dataReceived)
             {
                 List<Body> bodys = new List<Body>();
+                if(this.bodies.Length == 0) return;
+                Body leftBody = this.bodies[0];
+                Body rightBody = this.bodies[0];
+                bool hasLeft = false;
+                bool hasRight = false;
                 foreach(var b in this.bodies){
                     if(b.IsTracked)
                         bodys.Add(b);
                 }
+                foreach(var b in bodys){
+                    IReadOnlyDictionary<JointType, Joint> joints = b.Joints;
+
+                    Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+
+                    foreach (JointType jointType in joints.Keys)
+                    {
+                        CameraSpacePoint position = joints[jointType].Position;
+                        if (position.Z < 0)
+                        {
+                            position.Z = InferredZPositionClamp;
+                        }
+
+                        DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                        jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                    }
+
+                    if(jointPoints[JointType.SpineShoulder].X <= 275){
+                        hasLeft = true;
+                        leftBody = b;
+                    }else if(jointPoints[JointType.SpineShoulder].X > 275){
+                        hasRight = true;
+                        rightBody = b;
+                    }
+                }
+
+                string sout="";
+
                 
                 string str = "result: ";
 
-                using (DrawingContext dc = this.drawingGroup.Open())
-                {
-                    // Draw a transparent background to set the render size
-                    dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
+                str += "hasLeft " + hasLeft.ToString() + ", hasRight " + hasRight.ToString();
+                
+                if(hasLeft){
+                    using (DrawingContext dc = this.drawingGroup.Open())
+                    {
+                        // Draw a transparent background to set the render size
+                        dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
 
-                    int penIndex = 0;
-                    
-                    Pen drawPen = this.bodyColors[penIndex++];
+                        int penIndex = 0;
+                        
+                        Pen drawPen = this.bodyColors[penIndex++];
 
-                    if(bodys.Count > 0){
+                        if(bodys.Count > 0){
 
-                        Body body = bodys[0];
+                            Body body = leftBody;
 
-                        string sout="";
+                            this.DrawClippedEdges(body, dc);
 
-                        this.DrawClippedEdges(body, dc);
+                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
 
-                        IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+                            // convert the joint points to depth (display) space
+                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
 
-                        // convert the joint points to depth (display) space
-                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
-
-                        foreach (JointType jointType in joints.Keys)
-                        {
-                            // sometimes the depth(Z) of an inferred joint may show as negative
-                            // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
-                            CameraSpacePoint position = joints[jointType].Position;
-                            if (position.Z < 0)
+                            foreach (JointType jointType in joints.Keys)
                             {
-                                position.Z = InferredZPositionClamp;
+                                // sometimes the depth(Z) of an inferred joint may show as negative
+                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                                CameraSpacePoint position = joints[jointType].Position;
+                                if (position.Z < 0)
+                                {
+                                    position.Z = InferredZPositionClamp;
+                                }
+
+                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+
+                                sout += jointType + " " + depthSpacePoint.X + " " + depthSpacePoint.Y + "\n";
                             }
 
-                            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
-                            jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                            this.DrawBody(joints, jointPoints, dc, drawPen);
 
-                            sout += jointType + " " + depthSpacePoint.X + " " + depthSpacePoint.Y + "\n";
+                            this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
+                            this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
+
+                            
+                            sout += "result:";
+                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y){
+                                str += "L ";
+                                actionCode0 = ActionCode.Left;
+                            }
+                            if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                                str += "R ";
+                                actionCode0 = ActionCode.Right;
+                            }
+                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y && jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                                actionCode0 = ActionCode.Forward;
+                            }
+                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso){
+                                actionCode0 = ActionCode.GameStart;
+                            }
+                            label_info.Content = sout;
                         }
 
-                        this.DrawBody(joints, jointPoints, dc, drawPen);
-
-                        this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
-                        this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
-
-                        
-                        sout += "result:";
-                        if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y) str += "L ";
-                        if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y) str += "R ";
-                        label_info.Content = sout;
+                        // prevent drawing outside of our render area
+                        this.drawingGroup.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
                     }
-
-                    
-
-                    // prevent drawing outside of our render area
-                    this.drawingGroup.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
                 }
 
 
+                sout += "\n\n==========================\n\n";
 
+                if(hasRight){
+                    using (DrawingContext dc = this.drawingGroup1.Open())
+                    {
+                        // Draw a transparent background to set the render size
+                        dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
 
-                
-                using (DrawingContext dc = this.drawingGroup1.Open())
-                {
-                    // Draw a transparent background to set the render size
-                    dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
-
-                    int penIndex = 1;
-                    
-                    Pen drawPen = this.bodyColors[penIndex++];
-
-                    if(bodys.Count > 1){
-
-                        Body body = bodys[1];
-
+                        int penIndex = 1;
                         
-                        string sout="";
+                        Pen drawPen = this.bodyColors[penIndex++];
 
-                        this.DrawClippedEdges(body, dc);
+                        if(bodys.Count > 0){
 
-                        IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+                            Body body = rightBody;
 
-                        // convert the joint points to depth (display) space
-                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+                            this.DrawClippedEdges(body, dc);
 
-                        foreach (JointType jointType in joints.Keys)
-                        {
-                            // sometimes the depth(Z) of an inferred joint may show as negative
-                            // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
-                            CameraSpacePoint position = joints[jointType].Position;
-                            if (position.Z < 0)
+                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+
+                            // convert the joint points to depth (display) space
+                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+
+                            foreach (JointType jointType in joints.Keys)
                             {
-                                position.Z = InferredZPositionClamp;
+                                // sometimes the depth(Z) of an inferred joint may show as negative
+                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
+                                CameraSpacePoint position = joints[jointType].Position;
+                                if (position.Z < 0)
+                                {
+                                    position.Z = InferredZPositionClamp;
+                                }
+
+                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+
+                                sout += jointType + " " + depthSpacePoint.X + " " + depthSpacePoint.Y + "\n";
                             }
 
-                            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
-                            jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                            this.DrawBody(joints, jointPoints, dc, drawPen);
 
-                            sout += jointType + " " + depthSpacePoint.X + " " + depthSpacePoint.Y + "\n";
+                            this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
+                            this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
+
+                            
+                            sout += "result:";
+                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y){
+                                str += "L ";
+                                actionCode1 = ActionCode.Left;
+                            }
+                            if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                                str += "R ";
+                                actionCode1 = ActionCode.Right;
+                            }
+                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y && jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                                actionCode1 = ActionCode.Forward;
+                            }
+                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso){
+                                actionCode1 = ActionCode.GameStart;
+                            }
+                            label_info.Content = sout;
                         }
 
-                        this.DrawBody(joints, jointPoints, dc, drawPen);
-
-                        this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
-                        this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
-
                         
-                        sout += "result:";
-                        if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y) str += "L ";
-                        if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y) str += "R ";
-                        label_info.Content = sout;
+
+                        // prevent drawing outside of our render area
+                        this.drawingGroup1.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
                     }
-
-                    
-
-                    // prevent drawing outside of our render area
-                    this.drawingGroup1.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
                 }
                 str += "body count : " + this.bodies.Length;
-                label_info.Content = str;
+                this.label_info.Content = str;
+                this.action_info.Content = sout;//fuck 打錯字
+                //run run run run run run 
             }
+
+            send_sigals(this.get_control_signal());
         }
 
         /// <summary>
