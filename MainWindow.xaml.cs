@@ -16,6 +16,10 @@ namespace Microsoft.Samples.Kinect.BodyBasics
     using System.Windows.Media;
     using System.Windows.Media.Imaging;
     using Microsoft.Kinect;
+    using MQTTnet;
+    using MQTTnet.Client;
+    using MQTTnet.Client.Options;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -257,6 +261,12 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// </summary>
         private int energyRefreshIndex;
 
+        /// <summary>
+        /// Create the MQTT client object.
+        /// </summary>
+        IMqttClient client;
+
+
         private string carText1 = "Car1 : None";
 
         private string carText2 = "Car2 : None";
@@ -314,6 +324,58 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
         private void send_sigals(Tuple<ActionCode, ActionCode> actionCodes) {
             this.signal_info.Content = actionCodes.Item1.ToString() + " " + actionCodes.Item2.ToString();
+
+            PublishMessage("car0",actionCodes.Item1.ToString());
+            PublishMessage("car1", actionCodes.Item2.ToString());
+        }
+
+        /// <summary>
+        /// Establish connection.
+        /// </summary>
+        /// <param name="ip">ip that we need to connect</param>
+        private void EstablishConnect(string ip)
+        {
+
+            var mqttFactory = new MqttFactory();
+            this.client = mqttFactory.CreateMqttClient();
+
+            var options = new MqttClientOptionsBuilder()
+                         .WithClientId(Guid.NewGuid().ToString())
+                         .WithTcpServer(ip, 1883)
+                         .WithCleanSession()
+                         .Build();
+
+            client.UseDisconnectedHandler(e =>
+            {
+                MessageBox.Show("Connected to the broker unsuccessfully");
+            });
+
+            client.ConnectAsync(options);
+
+        }
+
+        /// <summary>
+        /// Publish message.
+        /// </summary>
+        /// <param name="topic">we need to publish the message to this topic</param>
+        /// <param name="s">the message that we need to publish</param>
+        private void PublishMessage(string topic, string s)
+        {
+
+            var message = new MqttApplicationMessageBuilder()
+                            .WithTopic(topic)
+                            .WithPayload(s)
+                            .WithAtLeastOnceQoS()
+                            .Build();
+
+            if (client.IsConnected)
+            {
+                client.PublishAsync(message);
+            }
+            else
+            {
+                MessageBox.Show("Client doesn't connect to MQTTserver");
+            }
         }
 
         /// <summary>
@@ -426,6 +488,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
             // use the window object as the view model in this simple example
             this.DataContext = this;
+
+            //Connect to the MQTTserver
+            EstablishConnect("122.116.34.215");
 
             // initialize the components (controls) of the window
             this.InitializeComponent();
