@@ -326,7 +326,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             this.signal_info.Content = actionCodes.Item1.ToString() + " " + actionCodes.Item2.ToString();
             
             PublishMessage("car0", (int)actionCodes.Item1);
-            PublishMessage("car1", (int)actionCodes.Item1);
+            PublishMessage("car1", (int)actionCodes.Item2);
         }
 
         /// <summary>
@@ -361,10 +361,10 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="s">the message that we need to publish</param>
         private void PublishMessage(string topic, int s)
         {
-
+           
             var message = new MqttApplicationMessageBuilder()
                             .WithTopic(topic)
-                            .WithPayload(s)
+                            .WithPayload(s.ToString())
                             .WithAtLeastOnceQoS()
                             .Build();
 
