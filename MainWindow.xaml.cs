@@ -324,9 +324,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
         private void send_sigals(Tuple<ActionCode, ActionCode> actionCodes) {
             this.signal_info.Content = actionCodes.Item1.ToString() + " " + actionCodes.Item2.ToString();
-
-            PublishMessage("car0",actionCodes.Item1.ToString());
-            PublishMessage("car1", actionCodes.Item2.ToString());
+            
+            PublishMessage("car0", (int)actionCodes.Item1);
+            PublishMessage("car1", (int)actionCodes.Item1);
         }
 
         /// <summary>
@@ -359,7 +359,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// </summary>
         /// <param name="topic">we need to publish the message to this topic</param>
         /// <param name="s">the message that we need to publish</param>
-        private void PublishMessage(string topic, string s)
+        private void PublishMessage(string topic, int s)
         {
 
             var message = new MqttApplicationMessageBuilder()
