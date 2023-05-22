@@ -741,18 +741,24 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
                             
                             sout += "result:";
-                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y){
-                                str += "L ";
-                                actionCode0 = ActionCode.Left;
-                            }
-                            if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
-                                str += "R ";
-                                actionCode0 = ActionCode.Right;
-                            }
-                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y && jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
+                            {
                                 actionCode0 = ActionCode.Forward;
                             }
-                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso){
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Closed)
+                            {
+                                actionCode0 = ActionCode.Right;
+                            }
+                            if (body.HandLeftState == HandState.Closed && body.HandRightState == HandState.Open)
+                            {
+                                actionCode0 = ActionCode.Left;
+                            }
+                            if (body.HandLeftState == HandState.Closed && body.HandRightState == HandState.Closed)
+                            {
+                                actionCode0 = ActionCode.Back;
+                            }
+                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso)
+                            {
                                 actionCode0 = ActionCode.GameStart;
                             }
                             label_info.Content = sout;
@@ -810,18 +816,24 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
                             
                             sout += "result:";
-                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y){
-                                str += "L ";
-                                actionCode1 = ActionCode.Left;
-                            }
-                            if (jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
-                                str += "R ";
-                                actionCode1 = ActionCode.Right;
-                            }
-                            if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.Head].Y && jointPoints[JointType.HandRight].Y < jointPoints[JointType.Head].Y){
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
+                            {
                                 actionCode1 = ActionCode.Forward;
                             }
-                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso){
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Closed)
+                            {
+                                actionCode1 = ActionCode.Right;
+                            }
+                            if (body.HandLeftState == HandState.Closed && body.HandRightState == HandState.Open)
+                            {
+                                actionCode1 = ActionCode.Left;
+                            }
+                            if (body.HandLeftState == HandState.Closed && body.HandRightState == HandState.Closed)
+                            {
+                                actionCode1 = ActionCode.Back;
+                            }
+                            if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso)
+                            {
                                 actionCode1 = ActionCode.GameStart;
                             }
                             label_info.Content = sout;
