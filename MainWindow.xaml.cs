@@ -266,6 +266,11 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// </summary>
         IMqttClient client;
 
+        /// <summary>
+        /// Record the last send signal.
+        /// </summary>
+        int last_signal0 = -1;
+        int last_signal1 = -1;
 
         private string carText1 = "Car1 : None";
 
@@ -277,7 +282,8 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         DateTime? lastStopTime0;
         DateTime? lastStopTime1;
 
-        enum ActionCode {
+        enum ActionCode
+        {
             None = 0,
             Left = 1,
             Right = 2,
@@ -288,33 +294,43 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             Error = 7
         }
 
-        private Tuple<ActionCode, ActionCode> get_control_signal() {
-            if(this.beamAngleConfidence > 0.9f){
+        private Tuple<ActionCode, ActionCode> get_control_signal()
+        {
+            if (this.beamAngleConfidence > 0.9f)
+            {
                 int baseIndex = (this.energyRefreshIndex + this.energy.Length - EnergyBitmapWidth) % this.energy.Length;
-                if(this.energy[(baseIndex) % this.energy.Length] > 0.3f){
-                    if(this.beamAngle < 0){
+                if (this.energy[(baseIndex) % this.energy.Length] > 10f)
+                {//0.3
+                    if (this.beamAngle < 0)
+                    {
                         this.actionCode0 = ActionCode.Stop;
                         lastStopTime0 = DateTime.UtcNow;
-                    }else{
+                    }
+                    else
+                    {
                         this.actionCode1 = ActionCode.Stop;
                         lastStopTime1 = DateTime.UtcNow;
                     }
                 }
             }
 
-            if(lastStopTime0 != null){
-                if((DateTime.UtcNow - (DateTime)lastStopTime0).Seconds < 2){
+            if (lastStopTime0 != null)
+            {
+                if ((DateTime.UtcNow - (DateTime)lastStopTime0).Seconds < 2)
+                {
                     this.actionCode0 = ActionCode.Stop;
                 }
             }
 
-            if(lastStopTime1 != null){
-                if((DateTime.UtcNow - (DateTime)lastStopTime1).Seconds < 2){
+            if (lastStopTime1 != null)
+            {
+                if ((DateTime.UtcNow - (DateTime)lastStopTime1).Seconds < 2)
+                {
                     this.actionCode1 = ActionCode.Stop;
                 }
             }
 
-            
+
 
             this.car1message.Content = "Car1 : " + actionCode0.ToString();
             this.car2message.Content = "Car2 : " + actionCode1.ToString();
@@ -322,11 +338,21 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             return new Tuple<ActionCode, ActionCode>(this.actionCode0, this.actionCode1);
         }
 
-        private void send_sigals(Tuple<ActionCode, ActionCode> actionCodes) {
+        private void send_sigals(Tuple<ActionCode, ActionCode> actionCodes)
+        {
             this.signal_info.Content = actionCodes.Item1.ToString() + " " + actionCodes.Item2.ToString();
-            
-            PublishMessage("car0", (int)actionCodes.Item1);
-            PublishMessage("car1", (int)actionCodes.Item2);
+
+            if ((int)actionCodes.Item1 != last_signal0)
+            {
+                last_signal0 = (int)actionCodes.Item1;
+                PublishMessage("car0", (int)actionCodes.Item1);
+            }
+            if ((int)actionCodes.Item2 != last_signal1)
+            {
+                last_signal1 = (int)actionCodes.Item2;
+                PublishMessage("car1", (int)actionCodes.Item2);
+            }
+
         }
 
         /// <summary>
@@ -361,7 +387,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="s">the message that we need to publish</param>
         private void PublishMessage(string topic, int s)
         {
-           
+
             var message = new MqttApplicationMessageBuilder()
                             .WithTopic(topic)
                             .WithPayload(s.ToString())
@@ -494,7 +520,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
             // initialize the components (controls) of the window
             this.InitializeComponent();
-            
+
             label_info.Content = "a";
 
             this.car1view.Navigate("https://www.google.com");
@@ -524,14 +550,18 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
         }
 
-        public string CarText1{
-            get{
+        public string CarText1
+        {
+            get
+            {
                 return this.carText1;
             }
         }
 
-        public string CarText2{
-            get{
+        public string CarText2
+        {
+            get
+            {
                 return this.carText2;
             }
         }
@@ -655,16 +685,18 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             if (dataReceived)
             {
                 List<Body> bodys = new List<Body>();
-                if(this.bodies.Length == 0) return;
+                if (this.bodies.Length == 0) return;
                 Body leftBody = this.bodies[0];
                 Body rightBody = this.bodies[0];
                 bool hasLeft = false;
                 bool hasRight = false;
-                foreach(var b in this.bodies){
-                    if(b.IsTracked)
+                foreach (var b in this.bodies)
+                {
+                    if (b.IsTracked)
                         bodys.Add(b);
                 }
-                foreach(var b in bodys){
+                foreach (var b in bodys)
+                {
                     IReadOnlyDictionary<JointType, Joint> joints = b.Joints;
 
                     Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
@@ -681,33 +713,38 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                         jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
                     }
 
-                    if(jointPoints[JointType.SpineShoulder].X <= 275){
+                    if (jointPoints[JointType.SpineShoulder].X <= 275)
+                    {
                         hasLeft = true;
                         leftBody = b;
-                    }else if(jointPoints[JointType.SpineShoulder].X > 275){
+                    }
+                    else if (jointPoints[JointType.SpineShoulder].X > 275)
+                    {
                         hasRight = true;
                         rightBody = b;
                     }
                 }
 
-                string sout="";
+                string sout = "";
 
-                
+
                 string str = "result: ";
 
                 str += "hasLeft " + hasLeft.ToString() + ", hasRight " + hasRight.ToString();
-                
-                if(hasLeft){
+
+                if (hasLeft)
+                {
                     using (DrawingContext dc = this.drawingGroup.Open())
                     {
                         // Draw a transparent background to set the render size
                         dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
 
                         int penIndex = 0;
-                        
+
                         Pen drawPen = this.bodyColors[penIndex++];
 
-                        if(bodys.Count > 0){
+                        if (bodys.Count > 0)
+                        {
 
                             Body body = leftBody;
 
@@ -739,8 +776,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                             this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
                             this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
 
-                            
+
                             sout += "result:";
+                            /*
                             if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
                             {
                                 actionCode0 = ActionCode.Forward;
@@ -760,6 +798,22 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                             if (body.HandLeftState == HandState.Lasso || body.HandRightState == HandState.Lasso)
                             {
                                 actionCode0 = ActionCode.GameStart;
+                            }*/
+                            if (Math.Abs(jointPoints[JointType.HandLeft].Y - jointPoints[JointType.HandRight].Y) < 30)
+                            {
+                                actionCode0 = ActionCode.Forward;
+                            }
+                            else if (jointPoints[JointType.HandLeft].Y > jointPoints[JointType.HandRight].Y)
+                            {
+                                actionCode0 = ActionCode.Right;
+                            }
+                            else if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.HandRight].Y)
+                            {
+                                actionCode0 = ActionCode.Left;
+                            }
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
+                            {
+                                actionCode0 = ActionCode.Back;
                             }
                             label_info.Content = sout;
                         }
@@ -772,17 +826,19 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
                 sout += "\n\n==========================\n\n";
 
-                if(hasRight){
+                if (hasRight)
+                {
                     using (DrawingContext dc = this.drawingGroup1.Open())
                     {
                         // Draw a transparent background to set the render size
                         dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
 
                         int penIndex = 1;
-                        
+
                         Pen drawPen = this.bodyColors[penIndex++];
 
-                        if(bodys.Count > 0){
+                        if (bodys.Count > 0)
+                        {
 
                             Body body = rightBody;
 
@@ -814,8 +870,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                             this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
                             this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
 
-                            
+
                             sout += "result:";
+                            /*
                             if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
                             {
                                 actionCode1 = ActionCode.Forward;
@@ -836,10 +893,29 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                             {
                                 actionCode1 = ActionCode.GameStart;
                             }
+                            */
+
+                            if (Math.Abs(jointPoints[JointType.HandLeft].Y - jointPoints[JointType.HandRight].Y) < 30)
+                            {
+                                actionCode1 = ActionCode.Forward;
+                            }
+                            else if (jointPoints[JointType.HandLeft].Y > jointPoints[JointType.HandRight].Y)
+                            {
+                                actionCode1 = ActionCode.Right;
+                            }
+                            else if (jointPoints[JointType.HandLeft].Y < jointPoints[JointType.HandRight].Y)
+                            {
+                                actionCode1 = ActionCode.Left;
+                            }
+                            if (body.HandLeftState == HandState.Open && body.HandRightState == HandState.Open)
+                            {
+                                actionCode1 = ActionCode.Back;
+                            }
+
                             label_info.Content = sout;
                         }
 
-                        
+
 
                         // prevent drawing outside of our render area
                         this.drawingGroup1.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
@@ -1108,9 +1184,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             // Rotate gradient to match angle
             // beamBarRotation.Angle = -beamAngleInDeg;
             // beamNeedleRotation.Angle = -beamAngleInDeg;
-            
+
             int baseIndex = (this.energyRefreshIndex + this.energy.Length - EnergyBitmapWidth) % this.energy.Length;
-            
+
 
             this.audio_info.Content = beamAngleInDeg.ToString() + " | " + this.beamAngleConfidence.ToString() + "\n" + this.energy[(baseIndex) % this.energy.Length].ToString();
 
